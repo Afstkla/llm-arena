@@ -1,0 +1,1228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Arena — LLM Benchmark</title>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@300;400;600;700&family=Overpass+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg-base: #080c14;
+  --bg-surface: #0d1219;
+  --bg-card: #111923;
+  --bg-card-active: #15202e;
+  --bg-input: #090e17;
+  --border: #1a2538;
+  --border-focus: #2a4060;
+  --text: #c8d4e0;
+  --text-sec: #6b7f99;
+  --text-muted: #344055;
+  --accent: #00d4ff;
+  --accent-dim: rgba(0, 212, 255, 0.10);
+  --success: #34d399;
+  --warning: #fbbf24;
+  --error: #f87171;
+  --radius: 8px;
+  --radius-sm: 4px;
+  --font-display: 'Chakra Petch', sans-serif;
+  --font-mono: 'Overpass Mono', 'Courier New', monospace;
+}
+
+html { font-size: 15px; }
+
+body {
+  font-family: var(--font-mono);
+  background-color: var(--bg-base);
+  background-image:
+    linear-gradient(rgba(0,212,255,0.018) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,212,255,0.018) 1px, transparent 1px);
+  background-size: 32px 32px;
+  color: var(--text);
+  min-height: 100vh;
+  line-height: 1.5;
+}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--border-focus); }
+
+/* ── Layout ── */
+.container { max-width: 1440px; margin: 0 auto; padding: 0 32px; }
+
+/* ── Header ── */
+header {
+  padding: 28px 0 20px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 28px;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.logo {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+}
+
+.logo h1 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.6rem;
+  letter-spacing: 0.15em;
+  color: var(--accent);
+  text-shadow: 0 0 30px rgba(0,212,255,0.25);
+}
+
+.logo .sep {
+  color: var(--text-muted);
+  font-weight: 300;
+}
+
+.logo .tagline {
+  font-family: var(--font-display);
+  font-weight: 300;
+  font-size: 0.85rem;
+  color: var(--text-sec);
+  letter-spacing: 0.06em;
+}
+
+.provider-status {
+  display: flex;
+  gap: 14px;
+  font-size: 0.75rem;
+  color: var(--text-sec);
+}
+
+.provider-status .dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  margin-right: 5px;
+  vertical-align: middle;
+  background: var(--error);
+}
+
+.provider-status .dot.ok { background: var(--success); box-shadow: 0 0 6px rgba(52,211,153,0.5); }
+
+/* ── Input Section ── */
+.input-section { margin-bottom: 28px; }
+
+.prompt-wrap {
+  position: relative;
+  margin-bottom: 16px;
+}
+
+.prompt-indicator {
+  position: absolute;
+  left: 14px;
+  top: 14px;
+  color: var(--accent);
+  font-size: 1rem;
+  font-weight: 700;
+  pointer-events: none;
+  opacity: 0.7;
+}
+
+textarea {
+  width: 100%;
+  min-height: 100px;
+  padding: 14px 14px 14px 32px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+  line-height: 1.6;
+  resize: vertical;
+  caret-color: var(--accent);
+  transition: border-color 0.2s;
+}
+
+textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent-dim), 0 0 20px rgba(0,212,255,0.05);
+}
+
+textarea::placeholder { color: var(--text-muted); }
+
+/* ── Advanced Settings ── */
+.advanced-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  color: var(--text-sec);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  cursor: pointer;
+  padding: 4px 0;
+  margin-bottom: 12px;
+}
+
+.advanced-toggle:hover { color: var(--text); }
+.advanced-toggle .arrow { transition: transform 0.2s; display: inline-block; }
+.advanced-toggle .arrow.open { transform: rotate(90deg); }
+
+.advanced-panel {
+  display: none;
+  gap: 14px;
+  margin-bottom: 16px;
+  padding: 14px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.advanced-panel.open { display: grid; grid-template-columns: 1fr 1fr 1fr; }
+
+.field label {
+  display: block;
+  font-size: 0.7rem;
+  color: var(--text-sec);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 6px;
+}
+
+.field input, .field textarea {
+  width: 100%;
+  padding: 8px 10px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+}
+
+.field input:focus, .field textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.field textarea { min-height: 60px; padding-left: 10px; resize: vertical; }
+.field input[type="range"] { padding: 0; }
+
+.field .range-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.field .range-val {
+  font-size: 0.8rem;
+  color: var(--accent);
+  min-width: 36px;
+  text-align: right;
+}
+
+/* ── Model Selector ── */
+.model-selector { margin-bottom: 16px; }
+
+.selector-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.selector-header .label {
+  font-size: 0.7rem;
+  color: var(--text-sec);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.selector-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.selector-actions button {
+  background: none;
+  border: none;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--text-sec);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.selector-actions button:hover { color: var(--text); }
+
+.model-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 14px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 100px;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--text-sec);
+  cursor: pointer;
+  transition: all 0.15s;
+  user-select: none;
+}
+
+.chip:hover { border-color: var(--border-focus); color: var(--text); }
+
+.chip.selected {
+  border-color: var(--chip-color, var(--accent));
+  background: color-mix(in srgb, var(--chip-color, var(--accent)) 10%, var(--bg-surface));
+  color: var(--text);
+}
+
+.chip .swatch {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--chip-color, var(--text-muted));
+}
+
+.chip.selected .swatch { box-shadow: 0 0 6px var(--chip-color, var(--accent)); }
+
+.chip.disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.chip .provider-tag {
+  font-size: 0.6rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* ── Run Button ── */
+.run-bar {
+  display: flex;
+  gap: 10px;
+}
+
+.btn-run {
+  flex: 1;
+  padding: 12px 24px;
+  background: linear-gradient(135deg, rgba(0,212,255,0.12), rgba(0,212,255,0.05));
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  color: var(--accent);
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.95rem;
+  letter-spacing: 0.12em;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-transform: uppercase;
+}
+
+.btn-run:hover:not(:disabled) {
+  background: linear-gradient(135deg, rgba(0,212,255,0.2), rgba(0,212,255,0.08));
+  box-shadow: 0 0 24px rgba(0,212,255,0.15);
+}
+
+.btn-run:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.btn-run.running {
+  border-color: var(--error);
+  color: var(--error);
+  background: linear-gradient(135deg, rgba(248,113,113,0.12), rgba(248,113,113,0.04));
+}
+
+.btn-run.running:hover {
+  background: linear-gradient(135deg, rgba(248,113,113,0.2), rgba(248,113,113,0.08));
+  box-shadow: 0 0 24px rgba(248,113,113,0.15);
+}
+
+/* ── Results ── */
+.results-section { display: none; }
+.results-section.visible { display: block; }
+
+/* ── Summary Table ── */
+.summary-wrap {
+  display: none;
+  margin-bottom: 24px;
+  overflow-x: auto;
+}
+
+.summary-wrap.visible { display: block; }
+
+.summary-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.78rem;
+}
+
+.summary-table th {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-sec);
+  padding: 10px 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+  transition: color 0.15s;
+}
+
+.summary-table th:hover { color: var(--accent); }
+.summary-table th.sorted { color: var(--accent); }
+.summary-table th .sort-arrow { margin-left: 4px; font-size: 0.6rem; }
+
+.summary-table td {
+  padding: 9px 12px;
+  border-bottom: 1px solid rgba(26,37,56,0.5);
+  white-space: nowrap;
+}
+
+.summary-table tr { transition: background 0.1s; }
+.summary-table tbody tr:hover { background: var(--bg-card); }
+
+.summary-table .rank { font-weight: 700; }
+.summary-table .rank.gold { color: #fbbf24; }
+.summary-table .rank.silver { color: #94a3b8; }
+.summary-table .rank.bronze { color: #d97706; }
+
+.summary-table .model-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.summary-table .model-swatch {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.summary-table .winner { color: var(--success); font-weight: 700; }
+
+/* ── Model Cards Grid ── */
+.cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+  gap: 14px;
+  margin-bottom: 40px;
+}
+
+.model-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--card-color, var(--border));
+  border-radius: var(--radius);
+  overflow: hidden;
+  animation: cardIn 0.3s ease-out both;
+}
+
+@keyframes cardIn {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.model-card.streaming {
+  border-color: var(--card-color, var(--accent));
+  box-shadow: 0 0 20px color-mix(in srgb, var(--card-color, var(--accent)) 15%, transparent);
+}
+
+.model-card.complete { border-color: var(--border); }
+.model-card.errored { border-left-color: var(--error); }
+
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.card-name {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.85rem;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.card-provider {
+  font-size: 0.6rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 2px 7px;
+  border: 1px solid var(--border);
+  border-radius: 100px;
+}
+
+.card-status {
+  font-size: 0.7rem;
+  color: var(--text-sec);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--text-muted);
+}
+
+.status-dot.waiting { background: var(--text-muted); }
+
+.status-dot.streaming {
+  background: var(--accent);
+  box-shadow: 0 0 6px var(--accent);
+  animation: pulse 1s ease-in-out infinite;
+}
+
+.status-dot.done { background: var(--success); }
+.status-dot.error { background: var(--error); }
+
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+.card-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1px;
+  background: var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+.metric {
+  background: var(--bg-card);
+  padding: 8px 10px;
+  text-align: center;
+}
+
+.metric .metric-label {
+  font-size: 0.58rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 2px;
+}
+
+.metric .metric-val {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.metric .metric-val.pending { color: var(--text-muted); }
+
+.card-output {
+  padding: 12px 14px;
+  max-height: 280px;
+  overflow-y: auto;
+  font-size: 0.78rem;
+  line-height: 1.65;
+  color: #94a8be;
+  word-break: break-word;
+  position: relative;
+  min-height: 48px;
+}
+
+.card-output.raw { white-space: pre-wrap; }
+
+.card-output.streaming::after {
+  content: '\2588';
+  color: var(--accent);
+  animation: blink 0.9s step-end infinite;
+  display: inline;
+}
+
+@keyframes blink { 50% { opacity: 0; } }
+
+.card-output .error-msg {
+  color: var(--error);
+  font-style: italic;
+}
+
+/* ── Markdown in output ── */
+.card-output p { margin: 0 0 0.6em; }
+.card-output p:last-child { margin-bottom: 0; }
+.card-output h1, .card-output h2, .card-output h3,
+.card-output h4, .card-output h5, .card-output h6 {
+  font-family: var(--font-display);
+  color: var(--text);
+  margin: 0.8em 0 0.4em;
+  line-height: 1.3;
+}
+.card-output h1 { font-size: 1.15em; }
+.card-output h2 { font-size: 1.05em; }
+.card-output h3 { font-size: 0.95em; }
+.card-output ul, .card-output ol { padding-left: 1.4em; margin: 0.4em 0; }
+.card-output li { margin: 0.15em 0; }
+.card-output code {
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+  background: rgba(0,212,255,0.07);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 1px 5px;
+}
+.card-output pre {
+  background: var(--bg-base);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  overflow-x: auto;
+  margin: 0.5em 0;
+}
+.card-output pre code {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 0.88em;
+  line-height: 1.5;
+}
+.card-output blockquote {
+  border-left: 3px solid var(--border-focus);
+  margin: 0.5em 0;
+  padding: 0.2em 0 0.2em 12px;
+  color: var(--text-sec);
+}
+.card-output table {
+  border-collapse: collapse;
+  margin: 0.5em 0;
+  font-size: 0.92em;
+  width: 100%;
+}
+.card-output th, .card-output td {
+  border: 1px solid var(--border);
+  padding: 4px 8px;
+  text-align: left;
+}
+.card-output th { background: var(--bg-surface); color: var(--text-sec); font-weight: 600; }
+.card-output hr { border: none; border-top: 1px solid var(--border); margin: 0.6em 0; }
+.card-output strong { color: var(--text); }
+.card-output a { color: var(--accent); text-decoration: none; }
+.card-output a:hover { text-decoration: underline; }
+
+.card-footer {
+  display: flex;
+  justify-content: flex-end;
+  padding: 6px 10px;
+  border-top: 1px solid var(--border);
+  gap: 6px;
+}
+
+.btn-small {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 3px 10px;
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  color: var(--text-sec);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.btn-small:hover { border-color: var(--text-sec); color: var(--text); }
+
+/* ── Empty State ── */
+.empty-state {
+  text-align: center;
+  padding: 64px 0;
+  color: var(--text-muted);
+}
+
+.empty-state .prompt-caret {
+  font-size: 2.5rem;
+  color: var(--accent);
+  opacity: 0.25;
+  animation: blink 1.2s step-end infinite;
+  display: block;
+  margin-bottom: 16px;
+}
+
+.empty-state p {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.empty-state kbd {
+  display: inline-block;
+  padding: 2px 6px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  font-size: 0.7rem;
+}
+
+/* ── Responsive ── */
+@media (max-width: 900px) {
+  .advanced-panel.open { grid-template-columns: 1fr; }
+  .cards-grid { grid-template-columns: 1fr; }
+  header { flex-direction: column; gap: 8px; }
+}
+</style>
+</head>
+<body>
+
+<div class="container">
+  <header>
+    <div class="logo">
+      <h1>ARENA</h1>
+      <span class="sep">/</span>
+      <span class="tagline">LLM Benchmark</span>
+    </div>
+    <div class="provider-status" id="providerStatus"></div>
+  </header>
+
+  <section class="input-section">
+    <div class="prompt-wrap">
+      <span class="prompt-indicator">&#9656;</span>
+      <textarea id="prompt" placeholder="Enter your prompt..." rows="4"></textarea>
+    </div>
+
+    <button class="advanced-toggle" id="advToggle">
+      <span class="arrow" id="advArrow">&#9656;</span> Advanced
+    </button>
+
+    <div class="advanced-panel" id="advPanel">
+      <div class="field">
+        <label>System Prompt</label>
+        <textarea id="systemPrompt" placeholder="Optional system instruction..."></textarea>
+      </div>
+      <div class="field">
+        <label>Max Tokens</label>
+        <div class="range-row">
+          <input type="range" id="maxTokens" min="64" max="16384" step="64" value="4096">
+          <span class="range-val" id="maxTokensVal">4096</span>
+        </div>
+      </div>
+      <div class="field">
+        <label>Temperature</label>
+        <div class="range-row">
+          <input type="range" id="temperature" min="0" max="2" step="0.05" value="0">
+          <span class="range-val" id="temperatureVal">0</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="model-selector">
+      <div class="selector-header">
+        <span class="label">Models</span>
+        <div class="selector-actions">
+          <button id="selectAll">Select all</button>
+          <button id="deselectAll">Clear</button>
+        </div>
+      </div>
+      <div class="model-chips" id="modelChips"></div>
+    </div>
+
+    <div class="run-bar">
+      <button class="btn-run" id="runBtn" disabled>RUN COMPARISON</button>
+    </div>
+  </section>
+
+  <section class="results-section" id="resultsSection">
+    <div class="summary-wrap" id="summaryWrap">
+      <table class="summary-table" id="summaryTable">
+        <thead>
+          <tr>
+            <th data-col="rank">#</th>
+            <th data-col="name">Model</th>
+            <th data-col="ttft">TTFT <span class="sort-arrow"></span></th>
+            <th data-col="totalTime" class="sorted">Total Time <span class="sort-arrow">&#9660;</span></th>
+            <th data-col="tokensPerSecond">Speed <span class="sort-arrow"></span></th>
+            <th data-col="inputTokens">In Tok <span class="sort-arrow"></span></th>
+            <th data-col="outputTokens">Out Tok <span class="sort-arrow"></span></th>
+            <th data-col="cost">Cost <span class="sort-arrow"></span></th>
+          </tr>
+        </thead>
+        <tbody id="summaryBody"></tbody>
+      </table>
+    </div>
+    <div class="cards-grid" id="cardsGrid"></div>
+  </section>
+
+  <div class="empty-state" id="emptyState">
+    <span class="prompt-caret">&#9618;</span>
+    <p>Type a prompt and select models to begin.</p>
+    <p style="margin-top:8px"><kbd>Ctrl</kbd> + <kbd>Enter</kbd> to run</p>
+  </div>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+const $$ = s => document.querySelectorAll(s);
+
+// ── State ──
+let config = { providers: {}, models: [] };
+const selected = new Set();
+let running = false;
+let results = new Map();
+let abortCtrl = null;
+let sortCol = 'totalTime';
+let sortAsc = true;
+let timerRAF = null;
+
+// ── Init ──
+async function init() {
+  const resp = await fetch('/api/config');
+  config = await resp.json();
+  renderProviderStatus();
+  renderChips();
+  bindEvents();
+  // Auto-select models whose providers are configured
+  config.models.forEach(m => {
+    const p = config.providers[m.provider];
+    if (p?.configured) selected.add(m.id);
+  });
+  updateChips();
+  updateRunBtn();
+}
+
+function renderProviderStatus() {
+  const el = $('#providerStatus');
+  el.innerHTML = Object.entries(config.providers).map(([k, p]) =>
+    `<span><span class="dot ${p.configured ? 'ok' : ''}"></span>${p.name}</span>`
+  ).join('');
+}
+
+function renderChips() {
+  const el = $('#modelChips');
+  el.innerHTML = config.models.map(m => {
+    const p = config.providers[m.provider];
+    const disabled = !p?.configured;
+    return `<button class="chip ${disabled ? 'disabled' : ''}" data-id="${m.id}" style="--chip-color:${m.color}" ${disabled ? 'title="API key not configured"' : ''}>
+      <span class="swatch"></span>
+      ${m.name}
+      <span class="provider-tag">${p?.name || m.provider}</span>
+    </button>`;
+  }).join('');
+}
+
+function updateChips() {
+  $$('.chip').forEach(el => {
+    el.classList.toggle('selected', selected.has(el.dataset.id));
+  });
+}
+
+function updateRunBtn() {
+  const btn = $('#runBtn');
+  if (running) {
+    btn.textContent = 'ABORT';
+    btn.classList.add('running');
+    btn.disabled = false;
+  } else {
+    btn.textContent = 'RUN COMPARISON';
+    btn.classList.remove('running');
+    btn.disabled = selected.size === 0 || !$('#prompt').value.trim();
+  }
+}
+
+function bindEvents() {
+  // Chip clicks
+  $('#modelChips').addEventListener('click', e => {
+    const chip = e.target.closest('.chip');
+    if (!chip || chip.classList.contains('disabled') || running) return;
+    const id = chip.dataset.id;
+    selected.has(id) ? selected.delete(id) : selected.add(id);
+    updateChips();
+    updateRunBtn();
+  });
+
+  // Select all / clear
+  $('#selectAll').addEventListener('click', () => {
+    config.models.forEach(m => {
+      if (config.providers[m.provider]?.configured) selected.add(m.id);
+    });
+    updateChips(); updateRunBtn();
+  });
+  $('#deselectAll').addEventListener('click', () => {
+    selected.clear(); updateChips(); updateRunBtn();
+  });
+
+  // Advanced toggle
+  $('#advToggle').addEventListener('click', () => {
+    const panel = $('#advPanel');
+    const open = panel.classList.toggle('open');
+    $('#advArrow').classList.toggle('open', open);
+  });
+
+  // Range inputs
+  $('#maxTokens').addEventListener('input', e => { $('#maxTokensVal').textContent = e.target.value; });
+  $('#temperature').addEventListener('input', e => { $('#temperatureVal').textContent = parseFloat(e.target.value).toFixed(2); });
+
+  // Run / abort
+  $('#runBtn').addEventListener('click', () => {
+    running ? abort() : run();
+  });
+
+  // Prompt changes
+  $('#prompt').addEventListener('input', updateRunBtn);
+
+  // Ctrl+Enter
+  document.addEventListener('keydown', e => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+      e.preventDefault();
+      if (!running && selected.size > 0 && $('#prompt').value.trim()) run();
+    }
+  });
+
+  // Table sorting
+  $$('.summary-table th[data-col]').forEach(th => {
+    th.addEventListener('click', () => {
+      const col = th.dataset.col;
+      if (col === 'rank' || col === 'name') return;
+      if (sortCol === col) { sortAsc = !sortAsc; } else { sortCol = col; sortAsc = true; }
+      renderSummary();
+    });
+  });
+}
+
+// ── Run ──
+async function run() {
+  running = true;
+  results = new Map();
+  abortCtrl = new AbortController();
+  updateRunBtn();
+
+  $('#emptyState').style.display = 'none';
+  const section = $('#resultsSection');
+  section.classList.add('visible');
+  $('#summaryWrap').classList.remove('visible');
+  const grid = $('#cardsGrid');
+  grid.innerHTML = '';
+
+  // Create cards for selected models
+  const models = [...selected];
+  models.forEach((id, i) => {
+    const m = config.models.find(x => x.id === id);
+    if (!m) return;
+    results.set(id, {
+      status: 'waiting',
+      startTime: null,
+      ttft: null,
+      totalTime: null,
+      inputTokens: 0,
+      outputTokens: 0,
+      tokensPerSecond: 0,
+      cost: 0,
+      output: '',
+      error: null,
+    });
+    grid.appendChild(createCard(m, i));
+  });
+
+  startTimers();
+
+  try {
+    const resp = await fetch('/api/run', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        prompt: $('#prompt').value,
+        models,
+        maxTokens: parseInt($('#maxTokens').value),
+        temperature: parseFloat($('#temperature').value),
+        systemPrompt: $('#systemPrompt').value,
+      }),
+      signal: abortCtrl.signal,
+    });
+
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      const parts = buf.split('\n\n');
+      buf = parts.pop();
+      for (const part of parts) {
+        if (!part.startsWith('data: ')) continue;
+        try {
+          const data = JSON.parse(part.slice(6));
+          handleEvent(data);
+        } catch {}
+      }
+    }
+  } catch (err) {
+    if (err.name !== 'AbortError') console.error('Stream error:', err);
+  }
+
+  running = false;
+  stopTimers();
+  updateRunBtn();
+  renderSummary();
+}
+
+function abort() {
+  if (abortCtrl) abortCtrl.abort();
+  running = false;
+  stopTimers();
+  updateRunBtn();
+}
+
+function handleEvent(data) {
+  const r = results.get(data.modelId);
+  if (!r && data.type !== 'done') return;
+
+  switch (data.type) {
+    case 'start':
+      r.status = 'streaming';
+      r.startTime = performance.now();
+      updateCard(data.modelId);
+      break;
+    case 'chunk':
+      r.output += data.content;
+      updateCardOutput(data.modelId);
+      break;
+    case 'complete':
+      r.status = 'complete';
+      r.ttft = data.ttft;
+      r.totalTime = data.totalTime;
+      r.inputTokens = data.inputTokens;
+      r.outputTokens = data.outputTokens;
+      r.tokensPerSecond = data.tokensPerSecond;
+      r.cost = data.cost;
+      updateCard(data.modelId);
+      break;
+    case 'error':
+      r.status = 'error';
+      r.error = data.error;
+      r.totalTime = r.startTime ? performance.now() - r.startTime : 0;
+      updateCard(data.modelId);
+      break;
+    case 'done':
+      break;
+  }
+}
+
+// ── Card rendering ──
+function createCard(model, index) {
+  const card = document.createElement('div');
+  card.className = 'model-card';
+  card.id = `card-${model.id}`;
+  card.style.cssText = `--card-color:${model.color}; animation-delay:${index * 50}ms`;
+
+  const prov = config.providers[model.provider];
+
+  card.innerHTML = `
+    <div class="card-header">
+      <div class="card-name">
+        <span style="color:${model.color}">${model.name}</span>
+        <span class="card-provider">${prov?.name || model.provider}</span>
+      </div>
+      <div class="card-status">
+        <span class="status-dot waiting" id="dot-${model.id}"></span>
+        <span id="status-${model.id}">Waiting...</span>
+      </div>
+    </div>
+    <div class="card-metrics">
+      <div class="metric"><div class="metric-label">TTFT</div><div class="metric-val pending" id="ttft-${model.id}">—</div></div>
+      <div class="metric"><div class="metric-label">Time</div><div class="metric-val pending" id="time-${model.id}">—</div></div>
+      <div class="metric"><div class="metric-label">Speed</div><div class="metric-val pending" id="speed-${model.id}">—</div></div>
+      <div class="metric"><div class="metric-label">Cost</div><div class="metric-val pending" id="cost-${model.id}">—</div></div>
+    </div>
+    <div class="card-output" id="output-${model.id}"></div>
+    <div class="card-footer">
+      <button class="btn-small" onclick="copyOutput('${model.id}')">Copy</button>
+    </div>
+  `;
+  return card;
+}
+
+function updateCard(modelId) {
+  const r = results.get(modelId);
+  if (!r) return;
+
+  const card = $(`#card-${CSS.escape(modelId)}`);
+  if (!card) return;
+
+  const dot = $(`#dot-${CSS.escape(modelId)}`);
+  const statusEl = $(`#status-${CSS.escape(modelId)}`);
+
+  card.classList.remove('streaming', 'complete', 'errored');
+
+  if (r.status === 'streaming') {
+    card.classList.add('streaming');
+    dot.className = 'status-dot streaming';
+    statusEl.textContent = 'Streaming...';
+    const out = card.querySelector('.card-output');
+    out.classList.add('streaming', 'raw');
+  } else if (r.status === 'complete') {
+    card.classList.add('complete');
+    dot.className = 'status-dot done';
+    statusEl.textContent = fmtMs(r.totalTime);
+    const out = card.querySelector('.card-output');
+    out.classList.remove('streaming', 'raw');
+    out.innerHTML = marked.parse(r.output);
+
+    $(`#ttft-${CSS.escape(modelId)}`).textContent = fmtMs(r.ttft);
+    $(`#ttft-${CSS.escape(modelId)}`).classList.remove('pending');
+    $(`#time-${CSS.escape(modelId)}`).textContent = fmtMs(r.totalTime);
+    $(`#time-${CSS.escape(modelId)}`).classList.remove('pending');
+    $(`#speed-${CSS.escape(modelId)}`).textContent = `${r.tokensPerSecond} t/s`;
+    $(`#speed-${CSS.escape(modelId)}`).classList.remove('pending');
+    $(`#cost-${CSS.escape(modelId)}`).textContent = fmtCost(r.cost);
+    $(`#cost-${CSS.escape(modelId)}`).classList.remove('pending');
+  } else if (r.status === 'error') {
+    card.classList.add('errored');
+    dot.className = 'status-dot error';
+    statusEl.textContent = 'Error';
+    card.querySelector('.card-output').classList.remove('streaming');
+    card.querySelector('.card-output').innerHTML = `<span class="error-msg">${escHtml(r.error)}</span>`;
+  }
+}
+
+function updateCardOutput(modelId) {
+  const r = results.get(modelId);
+  if (!r) return;
+  const el = $(`#output-${CSS.escape(modelId)}`);
+  if (!el) return;
+  el.textContent = r.output;
+  el.scrollTop = el.scrollHeight;
+}
+
+// Configure marked
+marked.setOptions({ breaks: true, gfm: true });
+
+// ── Live timers ──
+function startTimers() {
+  function tick() {
+    results.forEach((r, id) => {
+      if (r.status !== 'streaming' || !r.startTime) return;
+      const elapsed = performance.now() - r.startTime;
+      const el = $(`#time-${CSS.escape(id)}`);
+      if (el) el.textContent = fmtMs(elapsed);
+    });
+    timerRAF = requestAnimationFrame(tick);
+  }
+  timerRAF = requestAnimationFrame(tick);
+}
+
+function stopTimers() {
+  if (timerRAF) cancelAnimationFrame(timerRAF);
+  timerRAF = null;
+}
+
+// ── Summary table ──
+function renderSummary() {
+  const completed = [];
+  results.forEach((r, id) => {
+    if (r.status === 'complete') {
+      const m = config.models.find(x => x.id === id);
+      completed.push({ ...r, id, name: m?.name || id, color: m?.color || '#888', provider: config.providers[m?.provider]?.name || m?.provider });
+    }
+  });
+
+  if (completed.length === 0) return;
+
+  // Sort
+  completed.sort((a, b) => {
+    let av = a[sortCol], bv = b[sortCol];
+    if (typeof av === 'string') { av = av.toLowerCase(); bv = bv.toLowerCase(); }
+    return sortAsc ? (av - bv || 0) : (bv - av || 0);
+  });
+
+  // Find winners (lowest for ttft/totalTime/cost, highest for speed)
+  const winners = {};
+  const numericCols = ['ttft', 'totalTime', 'tokensPerSecond', 'cost'];
+  const lowerIsBetter = { ttft: true, totalTime: true, tokensPerSecond: false, cost: true };
+  numericCols.forEach(col => {
+    const vals = completed.map(r => r[col]).filter(v => v > 0);
+    if (vals.length === 0) return;
+    const best = lowerIsBetter[col] ? Math.min(...vals) : Math.max(...vals);
+    winners[col] = best;
+  });
+
+  // Update header arrows
+  $$('.summary-table th[data-col]').forEach(th => {
+    const col = th.dataset.col;
+    const arrow = th.querySelector('.sort-arrow');
+    th.classList.toggle('sorted', col === sortCol);
+    if (arrow) arrow.innerHTML = col === sortCol ? (sortAsc ? '&#9650;' : '&#9660;') : '';
+  });
+
+  const tbody = $('#summaryBody');
+  tbody.innerHTML = completed.map((r, i) => {
+    const rank = i + 1;
+    const rankClass = rank === 1 ? 'gold' : rank === 2 ? 'silver' : rank === 3 ? 'bronze' : '';
+    const w = (col, val) => val === winners[col] ? 'winner' : '';
+    return `<tr>
+      <td class="rank ${rankClass}">${rank}</td>
+      <td><div class="model-cell"><span class="model-swatch" style="background:${r.color}"></span>${r.name}<span class="card-provider">${r.provider}</span></div></td>
+      <td class="${w('ttft', r.ttft)}">${fmtMs(r.ttft)}</td>
+      <td class="${w('totalTime', r.totalTime)}">${fmtMs(r.totalTime)}</td>
+      <td class="${w('tokensPerSecond', r.tokensPerSecond)}">${r.tokensPerSecond} t/s</td>
+      <td>${r.inputTokens}</td>
+      <td>${r.outputTokens}</td>
+      <td class="${w('cost', r.cost)}">${fmtCost(r.cost)}</td>
+    </tr>`;
+  }).join('');
+
+  $('#summaryWrap').classList.add('visible');
+}
+
+// ── Helpers ──
+function fmtMs(ms) {
+  if (ms == null || ms === 0) return '—';
+  if (ms < 1000) return Math.round(ms) + 'ms';
+  return (ms / 1000).toFixed(2) + 's';
+}
+
+function fmtCost(c) {
+  if (!c) return '—';
+  const cents = c * 100;
+  if (cents < 0.01) return cents.toFixed(4) + '¢';
+  if (cents < 0.1) return cents.toFixed(3) + '¢';
+  if (cents < 10) return cents.toFixed(2) + '¢';
+  return cents.toFixed(1) + '¢';
+}
+
+function escHtml(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+function copyOutput(modelId) {
+  const r = results.get(modelId);
+  if (!r) return;
+  navigator.clipboard.writeText(r.output).then(() => {
+    const btn = $(`#card-${CSS.escape(modelId)} .btn-small`);
+    if (btn) { btn.textContent = 'Copied!'; setTimeout(() => btn.textContent = 'Copy', 1200); }
+  });
+}
+
+// ── Boot ──
+init();
+</script>
+</body>
+</html>
