@@ -43,7 +43,7 @@ async function consumeSSE(reader, decoder, onLine) {
 
 // ── Anthropic streaming ──
 
-async function streamAnthropic(model, prompt, systemPrompt, maxTokens, temperature, onEvent, signal) {
+async function streamAnthropic(model, prompt, systemPrompt, maxTokens, temperature, webSearch, onEvent, signal) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new Error('ANTHROPIC_API_KEY not configured');
 
@@ -55,6 +55,7 @@ async function streamAnthropic(model, prompt, systemPrompt, maxTokens, temperatu
   };
   if (systemPrompt) body.system = systemPrompt;
   if (temperature !== undefined) body.temperature = temperature;
+  if (webSearch) body.tools = [{ type: 'web_search_20250305', name: 'web_search', max_uses: 5 }];
 
   const start = Date.now();
   const resp = await fetch('https://api.anthropic.com/v1/messages', {
@@ -86,7 +87,8 @@ async function streamAnthropic(model, prompt, systemPrompt, maxTokens, temperatu
       inputTokens = data.message?.usage?.input_tokens || 0;
     } else if (data.type === 'content_block_delta') {
       const text = data.delta?.text || '';
-      if (text && ttft === null) ttft = Date.now() - start;
+      if (!text) return;
+      if (ttft === null) ttft = Date.now() - start;
       output += text;
       onEvent({ type: 'chunk', content: text });
     } else if (data.type === 'message_delta') {
@@ -100,27 +102,27 @@ async function streamAnthropic(model, prompt, systemPrompt, maxTokens, temperatu
   return { ttft: ttft || 0, totalTime: Date.now() - start, inputTokens, outputTokens, output };
 }
 
-// ── OpenAI streaming ──
+// ── OpenAI streaming (Responses API) ──
 
-async function streamOpenAI(model, prompt, systemPrompt, maxTokens, temperature, onEvent, signal) {
+async function streamOpenAI(model, prompt, systemPrompt, maxTokens, temperature, webSearch, onEvent, signal) {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) throw new Error('OPENAI_API_KEY not configured');
 
-  const messages = [];
-  if (systemPrompt) messages.push({ role: 'system', content: systemPrompt });
-  messages.push({ role: 'user', content: prompt });
+  const input = [];
+  if (systemPrompt) input.push({ role: 'system', content: systemPrompt });
+  input.push({ role: 'user', content: prompt });
 
   const body = {
     model: model.id,
-    messages,
-    max_completion_tokens: maxTokens,
+    input,
+    max_output_tokens: maxTokens,
     stream: true,
-    stream_options: { include_usage: true },
   };
   if (temperature !== undefined && !model.noTemperature) body.temperature = temperature;
+  if (webSearch) body.tools = [{ type: 'web_search' }];
 
   const start = Date.now();
-  const resp = await fetch('https://api.openai.com/v1/chat/completions', {
+  const resp = await fetch('https://api.openai.com/v1/responses', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -141,20 +143,19 @@ async function streamOpenAI(model, prompt, systemPrompt, maxTokens, temperature,
 
   await consumeSSE(reader, decoder, (line) => {
     const raw = line.slice(6).trim();
-    if (raw === '[DONE]') return;
     let data;
     try { data = JSON.parse(raw); } catch { return; }
 
-    if (data.usage) {
-      inputTokens = data.usage.prompt_tokens || 0;
-      outputTokens = data.usage.completion_tokens || 0;
-    }
-
-    const delta = data.choices?.[0]?.delta;
-    if (delta?.content) {
+    if (data.type === 'response.output_text.delta') {
       if (ttft === null) ttft = Date.now() - start;
-      output += delta.content;
-      onEvent({ type: 'chunk', content: delta.content });
+      output += data.delta || '';
+      onEvent({ type: 'chunk', content: data.delta || '' });
+    } else if (data.type === 'response.completed') {
+      const usage = data.response?.usage;
+      if (usage) {
+        inputTokens = usage.input_tokens || 0;
+        outputTokens = usage.output_tokens || 0;
+      }
     }
   });
 
@@ -164,7 +165,7 @@ async function streamOpenAI(model, prompt, systemPrompt, maxTokens, temperature,
 // ── Main run endpoint ──
 
 app.post('/api/run', async (req, res) => {
-  const { prompt, models: modelIds, maxTokens = 4096, temperature = 0, systemPrompt = '' } = req.body;
+  const { prompt, models: modelIds, maxTokens = 4096, temperature = 0, systemPrompt = '', webSearch = false } = req.body;
 
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
@@ -184,7 +185,7 @@ app.post('/api/run', async (req, res) => {
     sseWrite(res, { type: 'start', modelId: model.id });
     try {
       const handler = model.provider === 'anthropic' ? streamAnthropic : streamOpenAI;
-      const result = await handler(model, prompt, systemPrompt, maxTokens, temperature, (ev) => {
+      const result = await handler(model, prompt, systemPrompt, maxTokens, temperature, webSearch, (ev) => {
         sseWrite(res, { ...ev, modelId: model.id });
       }, ac.signal);
 

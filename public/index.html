@@ -158,6 +158,33 @@ textarea:focus {
 textarea::placeholder { color: var(--text-muted); }
 
 /* ── Advanced Settings ── */
+/* ── Prompt Store ── */
+.prompt-store {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.prompt-store select {
+  flex: 1;
+  max-width: 320px;
+  padding: 5px 8px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-sec);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  cursor: pointer;
+}
+
+.prompt-store select:focus { outline: none; border-color: var(--accent); color: var(--text); }
+.prompt-store select option { background: var(--bg-card); color: var(--text); }
+
+.btn-danger { color: var(--error) !important; border-color: var(--border) !important; }
+.btn-danger:hover { border-color: var(--error) !important; }
+
 .advanced-toggle {
   display: inline-flex;
   align-items: center;
@@ -353,6 +380,64 @@ textarea::placeholder { color: var(--text-muted); }
 .btn-run.running:hover {
   background: linear-gradient(135deg, rgba(248,113,113,0.2), rgba(248,113,113,0.08));
   box-shadow: 0 0 24px rgba(248,113,113,0.15);
+}
+
+/* ── Toggle Switch ── */
+.toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.toggle-label {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  transition: color 0.2s;
+  min-width: 24px;
+}
+
+.toggle-label.on { color: var(--accent); }
+
+.web-search-toggle {
+  display: inline-block;
+  cursor: pointer;
+  user-select: none;
+  vertical-align: middle;
+}
+
+.web-search-toggle input { display: none; }
+
+.toggle-track {
+  display: block;
+  width: 34px;
+  height: 18px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  position: relative;
+  transition: all 0.2s;
+}
+
+.toggle-thumb {
+  position: absolute;
+  top: 2px;
+  left: 3px;
+  width: 12px;
+  height: 12px;
+  background: var(--text-muted);
+  border-radius: 50%;
+  transition: all 0.2s;
+}
+
+.web-search-toggle input:checked ~ .toggle-track {
+  background: rgba(0,212,255,0.15);
+  border-color: var(--accent);
+}
+
+.web-search-toggle input:checked ~ .toggle-track .toggle-thumb {
+  left: 17px;
+  background: var(--accent);
+  box-shadow: 0 0 6px rgba(0,212,255,0.5);
 }
 
 /* ── Results ── */
@@ -706,12 +791,18 @@ textarea::placeholder { color: var(--text-muted); }
       <textarea id="prompt" placeholder="Enter your prompt..." rows="4"></textarea>
     </div>
 
+    <div class="prompt-store">
+      <select id="savedPrompts"><option value="">Load saved prompt...</option></select>
+      <button class="btn-small" id="savePrompt">Save</button>
+      <button class="btn-small btn-danger" id="deletePrompt" style="display:none">Del</button>
+    </div>
+
     <button class="advanced-toggle" id="advToggle">
       <span class="arrow" id="advArrow">&#9656;</span> Advanced
     </button>
 
     <div class="advanced-panel" id="advPanel">
-      <div class="field">
+      <div class="field" style="grid-column:1/-1">
         <label>System Prompt</label>
         <textarea id="systemPrompt" placeholder="Optional system instruction..."></textarea>
       </div>
@@ -727,6 +818,16 @@ textarea::placeholder { color: var(--text-muted); }
         <div class="range-row">
           <input type="range" id="temperature" min="0" max="2" step="0.05" value="0">
           <span class="range-val" id="temperatureVal">0</span>
+        </div>
+      </div>
+      <div class="field field-toggle">
+        <label>Web Search</label>
+        <div class="toggle-row">
+          <span class="toggle-label" id="webSearchLabel">Off</span>
+          <label class="web-search-toggle">
+            <input type="checkbox" id="webSearch">
+            <span class="toggle-track"><span class="toggle-thumb"></span></span>
+          </label>
         </div>
       </div>
     </div>
@@ -771,7 +872,7 @@ textarea::placeholder { color: var(--text-muted); }
   <div class="empty-state" id="emptyState">
     <span class="prompt-caret">&#9618;</span>
     <p>Type a prompt and select models to begin.</p>
-    <p style="margin-top:8px"><kbd>Ctrl</kbd> + <kbd>Enter</kbd> to run</p>
+    <p style="margin-top:8px"><kbd id="modKey">Ctrl</kbd> + <kbd>Enter</kbd> to run</p>
   </div>
 </div>
 
@@ -877,6 +978,13 @@ function bindEvents() {
   $('#maxTokens').addEventListener('input', e => { $('#maxTokensVal').textContent = e.target.value; });
   $('#temperature').addEventListener('input', e => { $('#temperatureVal').textContent = parseFloat(e.target.value).toFixed(2); });
 
+  // Web search toggle label
+  $('#webSearch').addEventListener('change', e => {
+    const lbl = $('#webSearchLabel');
+    lbl.textContent = e.target.checked ? 'On' : 'Off';
+    lbl.classList.toggle('on', e.target.checked);
+  });
+
   // Run / abort
   $('#runBtn').addEventListener('click', () => {
     running ? abort() : run();
@@ -950,6 +1058,7 @@ async function run() {
         maxTokens: parseInt($('#maxTokens').value),
         temperature: parseFloat($('#temperature').value),
         systemPrompt: $('#systemPrompt').value,
+        webSearch: $('#webSearch').checked,
       }),
       signal: abortCtrl.signal,
     });
@@ -1109,6 +1218,65 @@ function updateCardOutput(modelId) {
   el.textContent = r.output;
   el.scrollTop = el.scrollHeight;
 }
+
+// Detect macOS for shortcut display
+if (navigator.platform.includes('Mac')) {
+  const k = $('#modKey');
+  if (k) k.textContent = '\u2318';
+}
+
+// ── Prompt storage ──
+const STORAGE_KEY = 'arena_saved_prompts';
+
+function loadSavedPrompts() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; }
+  catch { return []; }
+}
+
+function saveSavedPrompts(prompts) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(prompts));
+}
+
+function renderSavedPrompts() {
+  const sel = $('#savedPrompts');
+  const prompts = loadSavedPrompts();
+  sel.innerHTML = '<option value="">Load saved prompt...</option>' +
+    prompts.map((p, i) => `<option value="${i}">${escHtml(p.name)}</option>`).join('');
+  $('#deletePrompt').style.display = 'none';
+}
+
+$('#savePrompt').addEventListener('click', () => {
+  const text = $('#prompt').value.trim();
+  if (!text) return;
+  const name = prompt('Name for this prompt:', text.slice(0, 60) + (text.length > 60 ? '...' : ''));
+  if (!name) return;
+  const prompts = loadSavedPrompts();
+  prompts.push({ name, text });
+  saveSavedPrompts(prompts);
+  renderSavedPrompts();
+  $('#savedPrompts').value = String(prompts.length - 1);
+  $('#deletePrompt').style.display = '';
+});
+
+$('#savedPrompts').addEventListener('change', (e) => {
+  const idx = e.target.value;
+  if (idx === '') { $('#deletePrompt').style.display = 'none'; return; }
+  const prompts = loadSavedPrompts();
+  const p = prompts[parseInt(idx)];
+  if (p) { $('#prompt').value = p.text; updateRunBtn(); }
+  $('#deletePrompt').style.display = '';
+});
+
+$('#deletePrompt').addEventListener('click', () => {
+  const idx = $('#savedPrompts').value;
+  if (idx === '') return;
+  const prompts = loadSavedPrompts();
+  prompts.splice(parseInt(idx), 1);
+  saveSavedPrompts(prompts);
+  renderSavedPrompts();
+});
+
+renderSavedPrompts();
 
 // Configure marked
 marked.setOptions({ breaks: true, gfm: true });
