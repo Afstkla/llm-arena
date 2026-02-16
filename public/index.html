@@ -508,6 +508,9 @@ textarea::placeholder { color: var(--text-muted); }
 
 .summary-table .winner { color: var(--success); font-weight: 700; }
 
+.summary-table tr.incorrect td { opacity: 0.3; }
+.summary-table tr.incorrect:hover td { opacity: 0.45; }
+
 /* ── Model Cards Grid ── */
 .cards-grid {
   display: grid;
@@ -735,6 +738,34 @@ textarea::placeholder { color: var(--text-muted); }
 
 .btn-small:hover { border-color: var(--text-sec); color: var(--text); }
 
+.btn-correct {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 3px 10px;
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.btn-correct:hover { border-color: var(--text-sec); color: var(--text-sec); }
+
+.btn-correct.marked {
+  border-color: var(--success);
+  color: var(--success);
+  background: rgba(52, 211, 153, 0.08);
+}
+
+.btn-correct.marked:hover {
+  border-color: var(--success);
+  background: rgba(52, 211, 153, 0.15);
+}
+
 /* ── Empty State ── */
 .empty-state {
   text-align: center;
@@ -861,6 +892,7 @@ textarea::placeholder { color: var(--text-muted); }
             <th data-col="inputTokens">In Tok <span class="sort-arrow"></span></th>
             <th data-col="outputTokens">Out Tok <span class="sort-arrow"></span></th>
             <th data-col="cost">Cost <span class="sort-arrow"></span></th>
+            <th data-col="correct">Correct <span class="sort-arrow"></span></th>
           </tr>
         </thead>
         <tbody id="summaryBody"></tbody>
@@ -1042,6 +1074,7 @@ async function run() {
       cost: 0,
       output: '',
       error: null,
+      correct: false,
     });
     grid.appendChild(createCard(m, i));
   });
@@ -1161,6 +1194,7 @@ function createCard(model, index) {
     </div>
     <div class="card-output" id="output-${model.id}"></div>
     <div class="card-footer">
+      <button class="btn-correct" onclick="toggleCorrect('${model.id}')" id="correct-${model.id}">&#10003; Correct</button>
       <button class="btn-small" onclick="copyOutput('${model.id}')">Copy</button>
     </div>
   `;
@@ -1343,7 +1377,7 @@ function renderSummary() {
     const rank = i + 1;
     const rankClass = rank === 1 ? 'gold' : rank === 2 ? 'silver' : rank === 3 ? 'bronze' : '';
     const w = (col, val) => val === winners[col] ? 'winner' : '';
-    return `<tr>
+    return `<tr class="${r.correct ? '' : 'incorrect'}">
       <td class="rank ${rankClass}">${rank}</td>
       <td><div class="model-cell"><span class="model-swatch" style="background:${r.color}"></span>${r.name}<span class="card-provider">${r.provider}</span></div></td>
       <td class="${w('ttft', r.ttft)}">${fmtMs(r.ttft)}</td>
@@ -1352,6 +1386,7 @@ function renderSummary() {
       <td>${r.inputTokens}</td>
       <td>${r.outputTokens}</td>
       <td class="${w('cost', r.cost)}">${fmtCost(r.cost)}</td>
+      <td style="text-align:center;${r.correct ? 'color:var(--success)' : 'color:var(--text-muted)'}">${r.correct ? '&#10003;' : '—'}</td>
     </tr>`;
   }).join('');
 
@@ -1378,6 +1413,15 @@ function escHtml(s) {
   const d = document.createElement('div');
   d.textContent = s;
   return d.innerHTML;
+}
+
+function toggleCorrect(modelId) {
+  const r = results.get(modelId);
+  if (!r) return;
+  r.correct = !r.correct;
+  const btn = $(`#correct-${CSS.escape(modelId)}`);
+  if (btn) btn.classList.toggle('marked', r.correct);
+  renderSummary();
 }
 
 function copyOutput(modelId) {
