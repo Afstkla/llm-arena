@@ -162,6 +162,61 @@ async function streamOpenAI(model, prompt, systemPrompt, maxTokens, temperature,
   return { ttft: ttft || 0, totalTime: Date.now() - start, inputTokens, outputTokens, output };
 }
 
+// ── Gemini streaming ──
+
+async function streamGemini(model, prompt, systemPrompt, maxTokens, temperature, webSearch, onEvent, signal) {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) throw new Error('GEMINI_API_KEY not configured');
+
+  const body = {
+    contents: [{ parts: [{ text: prompt }] }],
+    generationConfig: { maxOutputTokens: maxTokens },
+  };
+  if (systemPrompt) body.systemInstruction = { parts: [{ text: systemPrompt }] };
+  if (temperature !== undefined) body.generationConfig.temperature = temperature;
+  if (webSearch) body.tools = [{ google_search: {} }];
+
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model.id}:streamGenerateContent?alt=sse`;
+  const start = Date.now();
+  const resp = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-goog-api-key': apiKey,
+    },
+    body: JSON.stringify(body),
+    signal,
+  });
+
+  if (!resp.ok) {
+    const text = await resp.text();
+    throw new Error(`${resp.status}: ${text.slice(0, 300)}`);
+  }
+
+  const reader = resp.body.getReader();
+  const decoder = new TextDecoder();
+  let ttft = null, inputTokens = 0, outputTokens = 0, output = '';
+
+  await consumeSSE(reader, decoder, (line) => {
+    let data;
+    try { data = JSON.parse(line.slice(6)); } catch { return; }
+
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (text) {
+      if (ttft === null) ttft = Date.now() - start;
+      output += text;
+      onEvent({ type: 'chunk', content: text });
+    }
+
+    if (data.usageMetadata) {
+      inputTokens = data.usageMetadata.promptTokenCount || 0;
+      outputTokens = data.usageMetadata.candidatesTokenCount || 0;
+    }
+  });
+
+  return { ttft: ttft || 0, totalTime: Date.now() - start, inputTokens, outputTokens, output };
+}
+
 // ── Main run endpoint ──
 
 app.post('/api/run', async (req, res) => {
@@ -184,7 +239,8 @@ app.post('/api/run', async (req, res) => {
   const tasks = selected.map(async (model) => {
     sseWrite(res, { type: 'start', modelId: model.id });
     try {
-      const handler = model.provider === 'anthropic' ? streamAnthropic : streamOpenAI;
+      const handler = model.provider === 'anthropic' ? streamAnthropic
+        : model.provider === 'google' ? streamGemini : streamOpenAI;
       const result = await handler(model, prompt, systemPrompt, maxTokens, temperature, webSearch, (ev) => {
         sseWrite(res, { ...ev, modelId: model.id });
       }, ac.signal);

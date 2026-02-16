@@ -9,6 +9,11 @@
       "name": "OpenAI",
       "baseUrl": "https://api.openai.com",
       "envKey": "OPENAI_API_KEY"
+    },
+    "google": {
+      "name": "Google",
+      "baseUrl": "https://generativelanguage.googleapis.com",
+      "envKey": "GEMINI_API_KEY"
     }
   },
   "models": [
@@ -85,6 +90,46 @@
       "inputCostPer1M": 0.25,
       "outputCostPer1M": 1.00,
       "noTemperature": true
+    },
+    {
+      "id": "gemini-2.5-pro",
+      "name": "Gemini 2.5 Pro",
+      "provider": "google",
+      "color": "#4ade80",
+      "inputCostPer1M": 1.25,
+      "outputCostPer1M": 10.00
+    },
+    {
+      "id": "gemini-2.5-flash",
+      "name": "Gemini 2.5 Flash",
+      "provider": "google",
+      "color": "#a3e635",
+      "inputCostPer1M": 0.30,
+      "outputCostPer1M": 2.50
+    },
+    {
+      "id": "gemini-2.5-flash-lite",
+      "name": "Gemini 2.5 Flash-Lite",
+      "provider": "google",
+      "color": "#d9f99d",
+      "inputCostPer1M": 0.10,
+      "outputCostPer1M": 0.40
+    },
+    {
+      "id": "gemini-3-pro-preview",
+      "name": "Gemini 3 Pro",
+      "provider": "google",
+      "color": "#22c55e",
+      "inputCostPer1M": 2.00,
+      "outputCostPer1M": 12.00
+    },
+    {
+      "id": "gemini-3-flash-preview",
+      "name": "Gemini 3 Flash",
+      "provider": "google",
+      "color": "#86efac",
+      "inputCostPer1M": 0.50,
+      "outputCostPer1M": 3.00
     }
   ]
 }
